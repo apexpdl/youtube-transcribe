@@ -1,0 +1,51 @@
+# TubeTranscript — full stack (FastAPI backend + Next.js frontend).
+#
+#   docker compose up --build
+#
+# Frontend: http://localhost:3000
+# Backend:  http://localhost:8000  (docs at /docs)
+
+services:
+  backend:
+    build:
+      context: ./backend
+    image: tubetranscript-backend
+    container_name: tubetranscript-backend
+    ports:
+      - "8000:8000"
+    environment:
+      ENVIRONMENT: production
+      DEBUG: "false"
+      CORS_ORIGINS: "http://localhost:3000,http://127.0.0.1:3000"
+      WHISPER_ENABLED: "true"
+      WHISPER_MODEL: ${WHISPER_MODEL:-base}
+      WHISPER_DEVICE: auto
+      RATE_LIMIT_ENABLED: "true"
+      # Optional: set OPENAI_API_KEY in a .env file next to this compose file
+      # to enable high-quality AI summaries + translation.
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+    volumes:
+      # Persist the downloaded Whisper model + cached transcripts across restarts.
+      - whisper-models:/home/appuser/.cache/whisper
+      - transcript-cache:/app/.cache
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # Baked into the client bundle at build time — must be the URL the
+        # browser uses to reach the backend.
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    image: tubetranscript-frontend
+    container_name: tubetranscript-frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  whisper-models:
+  transcript-cache:

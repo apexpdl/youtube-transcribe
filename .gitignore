@@ -1,0 +1,46 @@
+# ---------- General ----------
+.DS_Store
+*.log
+.env
+.env.local
+.env.*.local
+*.pem
+
+# ---------- Node / Next.js (frontend) ----------
+node_modules/
+.next/
+out/
+build/
+dist/
+.vercel
+.turbo
+*.tsbuildinfo
+next-env.d.ts.bak
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ---------- Python (backend) ----------
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# ---------- App runtime artifacts ----------
+backend/.cache/
+backend/.tmp/
+.cache/
+.tmp/
+
+# ---------- Editor / IDE ----------
+.idea/
+.vscode/
+*.swp

@@ -1,0 +1,27 @@
+# ---- Web framework ----
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic==2.10.4
+pydantic-settings==2.7.0
+python-dotenv==1.0.1
+python-multipart==0.0.20
+
+# ---- YouTube / transcripts ----
+youtube-transcript-api==0.6.2
+yt-dlp>=2024.11.18
+
+# ---- Speech-to-text (local Whisper). Pulls in torch automatically. ----
+# In Docker we pre-install the CPU build of torch from the PyTorch index
+# (see backend/Dockerfile) so this stays lightweight on servers without a GPU.
+openai-whisper==20240930
+
+# ---- Rate limiting ----
+slowapi==0.1.9
+
+# ---- Misc ----
+httpx==0.28.1
+tenacity==9.0.0
+aiofiles==24.1.0
+
+# ---- Optional: AI summary / translation (only used when OPENAI_API_KEY is set) ----
+openai==1.59.0
