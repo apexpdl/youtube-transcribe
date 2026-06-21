@@ -27,6 +27,11 @@ class Settings(BaseSettings):
     environment: str = "development"
     debug: bool = True
 
+    # Path prefix the API is mounted under behind a proxy (e.g. "/_/backend" on
+    # Vercel multi-service). Leave empty for local/Docker. Routing tolerates the
+    # prefix being present or already stripped by the proxy.
+    root_path: str = ""
+
     # ---- CORS (comma separated list of allowed origins) ----
     cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
 

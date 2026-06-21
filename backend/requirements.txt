@@ -1,3 +1,7 @@
+# ---- Core requirements (captions-only capable; safe for Vercel/serverless) ----
+# The local Whisper speech-to-text fallback lives in requirements-whisper.txt
+# because it pulls in PyTorch, which is too large for serverless platforms.
+
 # ---- Web framework ----
 fastapi==0.115.6
 uvicorn[standard]==0.34.0
@@ -9,11 +13,6 @@ python-multipart==0.0.20
 # ---- YouTube / transcripts ----
 youtube-transcript-api==0.6.2
 yt-dlp>=2024.11.18
-
-# ---- Speech-to-text (local Whisper). Pulls in torch automatically. ----
-# In Docker we pre-install the CPU build of torch from the PyTorch index
-# (see backend/Dockerfile) so this stays lightweight on servers without a GPU.
-openai-whisper==20240930
 
 # ---- Rate limiting ----
 slowapi==0.1.9

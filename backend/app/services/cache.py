@@ -30,7 +30,13 @@ class TranscriptCache:
     def __init__(self) -> None:
         self._lock = threading.RLock()
         self._memory: dict[str, tuple[float, TranscriptResponse]] = {}
-        self._dir = ensure_dir(settings.cache_dir)
+        # The disk layer is best-effort: on read-only filesystems (e.g. Vercel /
+        # other serverless platforms) we silently fall back to memory-only.
+        try:
+            self._dir: Path | None = ensure_dir(settings.cache_dir)
+        except OSError as exc:
+            logger.warning("Disk cache disabled (%s); using in-memory cache only.", exc)
+            self._dir = None
 
     # ------------------------------------------------------------------ #
     @staticmethod
@@ -59,6 +65,9 @@ class TranscriptCache:
             if cached and now - cached[0] < settings.cache_ttl_seconds:
                 logger.info("Cache hit (memory) for %s", key)
                 return cached[1].model_copy(update={"cached": True})
+
+            if self._dir is None:
+                return None
 
             path = self._path_for(key)
             if path.exists():
@@ -92,6 +101,8 @@ class TranscriptCache:
         now = time.time()
         with self._lock:
             self._memory[key] = (now, response)
+            if self._dir is None:
+                return
             try:
                 payload = {"_cached_at": now, "data": response.model_dump(mode="json")}
                 self._path_for(key).write_text(
@@ -104,6 +115,8 @@ class TranscriptCache:
         """Wipe both cache layers (used by tests)."""
         with self._lock:
             self._memory.clear()
+            if self._dir is None:
+                return
             for file in self._dir.glob("*.json"):
                 file.unlink(missing_ok=True)
 

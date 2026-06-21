@@ -1,0 +1,12 @@
+# ---- Full requirements including the local Whisper speech-to-text fallback ----
+# Used by the Docker image (Render / Railway / self-hosted) where ffmpeg is
+# available and there's enough memory for PyTorch. Whisper pulls in torch, so
+# the Dockerfile pre-installs the CPU build of torch first to avoid the huge
+# CUDA wheels.
+#
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+#   pip install -r requirements-whisper.txt
+
+-r requirements.txt
+
+openai-whisper==20240930

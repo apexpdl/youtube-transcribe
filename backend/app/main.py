@@ -50,6 +50,10 @@ app = FastAPI(
     lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc",
+    # When set (e.g. "/_/backend" on Vercel), Starlette strips this prefix from
+    # incoming paths before matching routes, so the same app works locally and
+    # behind a path-based proxy.
+    root_path=settings.root_path,
 )
 
 # ---- Rate limiting (decorator-based; see app/rate_limit.py) ----

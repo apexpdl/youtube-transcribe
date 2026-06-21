@@ -14,11 +14,11 @@ RUN apt-get update \
 WORKDIR /app
 
 # Install the CPU build of torch first so Whisper doesn't pull the huge CUDA
-# wheels. Then install the rest of the requirements.
-COPY requirements.txt ./
+# wheels. Then install the full requirements (core + Whisper).
+COPY requirements.txt requirements-whisper.txt ./
 RUN pip install --upgrade pip \
     && pip install --index-url https://download.pytorch.org/whl/cpu torch \
-    && pip install -r requirements.txt
+    && pip install -r requirements-whisper.txt
 
 # Copy the application code.
 COPY app ./app

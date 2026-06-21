@@ -115,16 +115,22 @@ Whisper and yt-dlp.
 ```bash
 cd backend
 python -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
-pip install -r requirements.txt  # or requirements-dev.txt for tests/lint
-cp .env.example .env
+source .venv/bin/activate            # Windows: .venv\Scripts\activate
 
+# Captions-only (light, no PyTorch):
+pip install -r requirements.txt
+# …or the full install with the local Whisper AI fallback:
+pip install torch --index-url https://download.pytorch.org/whl/cpu
+pip install -r requirements-whisper.txt
+
+cp .env.example .env
 uvicorn app.main:app --reload --port 8000
 ```
 
-> Installing `openai-whisper` pulls in PyTorch. On a CPU-only machine you can
-> install the lighter CPU build first:
-> `pip install torch --index-url https://download.pytorch.org/whl/cpu`
+> **Dependency split:** `requirements.txt` is the light, captions-only core
+> (also used by the Vercel deploy). `requirements-whisper.txt` adds
+> `openai-whisper` (PyTorch) for the AI fallback and is what the Docker image
+> installs. Whisper also needs **ffmpeg** on your PATH.
 
 ### 2) Frontend
 
@@ -208,6 +214,7 @@ Errors are always returned as `{ "detail": "human message", "code": "machine_cod
 | Variable | Default | Description |
 | --- | --- | --- |
 | `ENVIRONMENT` | `development` | `development` / `production`. |
+| `ROOT_PATH` | `` (empty) | Path prefix when mounted behind a proxy (e.g. `/_/backend` on Vercel). |
 | `CORS_ORIGINS` | `http://localhost:3000,…` | Comma-separated allowed origins. |
 | `CACHE_ENABLED` | `true` | Enable transcript caching. |
 | `CACHE_TTL_SECONDS` | `604800` | Cache lifetime (7 days). |
@@ -235,15 +242,50 @@ Errors are always returned as `{ "detail": "human message", "code": "machine_cod
 
 ## ☁️ Deployment
 
-### Frontend → Vercel
+There are two supported paths. **Option A** runs everything on Vercel (simplest,
+but **captions-only** — see the limitation below). **Option B** splits the
+frontend and backend and is the only way to get the **Whisper AI fallback**.
 
-1. Import the repo into Vercel and set the **Root Directory** to `frontend/`.
-2. Framework preset: **Next.js** (build `next build`, output auto-detected).
+### Option A — All on Vercel (single platform)
+
+This repo includes a root [`vercel.json`](./vercel.json) that declares both
+services (Vercel's multi-service feature): the Next.js frontend at `/` and the
+FastAPI backend at `/_/backend`.
+
+1. Import the repo into Vercel. It auto-detects both services and the
+   `vercel.json` (no extra config needed).
+2. In the project's **Environment Variables**, add (Production **and** Preview):
+   - **`NEXT_PUBLIC_API_URL`** = `/_/backend` — points the browser at the
+     backend's route prefix (a relative URL, so it works on any Vercel domain).
+   - **`ROOT_PATH`** = `/_/backend` — tells FastAPI it's mounted under that
+     prefix so routing/OpenAPI are correct.
+   - *(optional)* **`OPENAI_API_KEY`** to enable AI summaries + translation.
+   - *(optional)* **`CACHE_DIR`** = `/tmp/tt-cache` — the only writable path on
+     serverless; otherwise the disk cache auto-disables and runs memory-only.
+3. Deploy. Frontend → `https://<app>.vercel.app`, backend docs →
+   `https://<app>.vercel.app/_/backend/docs`.
+
+> ⚠️ **Captions-only on Vercel.** The serverless backend uses the slim
+> `requirements.txt` (no PyTorch/ffmpeg), so the **Whisper fallback is disabled**
+> — videos *without* captions will return a clear "AI transcription unavailable"
+> error. YouTube also sometimes rate-limits requests from cloud IPs. The
+> frontend automatically falls back to the synchronous endpoint if the async job
+> store isn't persistent across invocations. For full Whisper support, use
+> Option B for the backend.
+
+### Option B — Split: Vercel (frontend) + Render/Railway (backend)
+
+**Frontend → Vercel**
+
+1. Import the repo and set the **Root Directory** to `frontend/` (ignore the
+   root `vercel.json` for this path, or deploy the frontend from a separate
+   project).
+2. Framework preset: **Next.js** (auto-detected).
 3. Add env var **`NEXT_PUBLIC_API_URL`** = your deployed backend URL
    (e.g. `https://tubetranscript-api.onrender.com`).
-4. Deploy. (Remove `output: "standalone"` is **not** needed — Vercel handles it.)
+4. Deploy.
 
-### Backend → Render
+**Backend → Render**
 
 1. **New → Web Service**, connect the repo, set **Root Directory** to `backend/`.
 2. Environment: **Docker** (uses `backend/Dockerfile`, which includes ffmpeg).
@@ -254,7 +296,7 @@ Errors are always returned as `{ "detail": "human message", "code": "machine_cod
 > Whisper + PyTorch need memory. Use at least a 2 GB instance (or `WHISPER_MODEL=tiny`),
 > or set `WHISPER_ENABLED=false` to run captions-only on tiny instances.
 
-### Backend → Railway
+**Backend → Railway**
 
 1. **New Project → Deploy from Repo**; Railway detects `backend/Dockerfile`
    (set the service root to `backend/`).

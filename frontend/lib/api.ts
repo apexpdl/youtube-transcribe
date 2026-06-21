@@ -11,6 +11,17 @@ import type {
 
 const DEFAULT_API_URL = "http://localhost:8000";
 
+/** An error carrying the HTTP status, so callers can react to specific codes. */
+export class ApiHttpError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiHttpError";
+    this.status = status;
+  }
+}
+
 /**
  * Resolve the backend base URL from the public env var, trimming any trailing
  * slash so we can safely concatenate paths.
@@ -133,7 +144,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   if (!response.ok) {
     const fallback = `Request failed with status ${response.status} (${response.statusText || "error"}).`;
     const message = await extractErrorMessage(response, fallback);
-    throw new Error(message);
+    throw new ApiHttpError(message, response.status);
   }
 
   // 204 No Content or empty body.

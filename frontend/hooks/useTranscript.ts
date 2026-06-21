@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { getJob, startTranscriptJob } from "@/lib/api";
+import { ApiHttpError, getJob, getTranscript, startTranscriptJob } from "@/lib/api";
 import type { JobState, TranscriptResponse } from "@/lib/types";
 
 const POLL_INTERVAL_MS = 1500;
@@ -48,6 +48,10 @@ export function useTranscript(): UseTranscriptResult {
   // Monotonic run id so stale async callbacks can detect they are obsolete.
   const runIdRef = useRef(0);
   const mountedRef = useRef(true);
+  // Remember the latest request so we can fall back to the synchronous endpoint
+  // if the async job can't be polled (e.g. an ephemeral/serverless backend that
+  // doesn't keep the in-memory job between requests).
+  const requestRef = useRef<{ url: string; force: boolean } | null>(null);
 
   const clearTimer = useCallback(() => {
     if (timerRef.current !== null) {
@@ -123,6 +127,42 @@ export function useTranscript(): UseTranscriptResult {
             return; // superseded or unmounted; ignore
           }
           if (runId !== runIdRef.current || !mountedRef.current) return;
+
+          // If the job can't be found (404), the backend likely didn't keep the
+          // job between requests (serverless/multi-instance). Fall back to the
+          // synchronous endpoint, which does the whole job in one request.
+          if (err instanceof ApiHttpError && err.status === 404 && requestRef.current) {
+            clearTimer();
+            const controller = new AbortController();
+            abortRef.current = controller;
+            setJob((prev) =>
+              prev ? { ...prev, status: "processing", message: "Finishing up…" } : prev,
+            );
+            try {
+              const result = await getTranscript(
+                {
+                  url: requestRef.current.url,
+                  force_whisper: requestRef.current.force,
+                },
+                controller.signal,
+              );
+              if (runId !== runIdRef.current || !mountedRef.current) return;
+              setData(result);
+              setProgress(100);
+              setState("success");
+            } catch (syncErr) {
+              if (syncErr instanceof DOMException && syncErr.name === "AbortError") return;
+              if (runId !== runIdRef.current || !mountedRef.current) return;
+              setError(
+                syncErr instanceof Error
+                  ? syncErr.message
+                  : "Transcription failed. Please try again.",
+              );
+              setState("error");
+            }
+            return;
+          }
+
           setError(
             err instanceof Error
               ? err.message
@@ -147,6 +187,7 @@ export function useTranscript(): UseTranscriptResult {
       // Supersede any prior run.
       runIdRef.current += 1;
       const runId = runIdRef.current;
+      requestRef.current = { url: trimmed, force };
       stop();
 
       setState("loading");
